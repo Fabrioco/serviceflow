@@ -1,0 +1,54 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+out/
+.next/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# Variáveis de ambiente (segredos nunca vão pro Git)
+.env
+.env.*
+!.env.example
+
+# Testes e cobertura
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Cache de ferramentas
+.eslintcache
+.cache/
+.turbo/
+
+# Prisma: client gerado em pasta customizada (só se você configurou output)
+# apps/api/src/generated/
+
+# Docker (dados locais, se algum dia usar bind mount em vez de volume)
+postgres-data/
+pgdata/
+
+# Editores
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
