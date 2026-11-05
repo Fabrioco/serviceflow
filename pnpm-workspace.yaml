@@ -1,6 +1,9 @@
-allowBuilds:
-  '@scarf/scarf': false
-  bcrypt: false
-
 packages:
   - "apps/*"
+
+allowBuilds:
+  '@scarf/scarf': false
+  bcrypt: true
+  esbuild: true
+  sharp: false
+  unrs-resolver: false
