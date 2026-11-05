@@ -1,0 +1,69 @@
+// use prisma-8
+
+enum Role { OWNER ADMIN TECHNICIAN }
+enum WorkOrderStatus { OPEN SCHEDULED IN_PROGRESS COMPLETED CANCELED }
+
+model Organization {
+  id         String   @id @onCreate(uuid())
+  name       String
+  createdAt  DateTime @default(now())
+  users      User[]
+  customers  Customer[]
+  workOrders WorkOrder[]
+}
+
+model User {
+  id             String @id @onCreate(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String @unique
+  passwordHash   String
+  role           Role
+  createdAt      DateTime @default(now())
+  assigned       WorkOrder[] @relation("assigned")
+}
+
+model Customer {
+  id             String @id @onCreate(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  phone          String
+  email          String?
+  address        String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  workOrders     WorkOrder[]
+
+  @@index([organizationId, phone])
+}
+
+model WorkOrder {
+  id             String @id @onCreate(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id])
+  technicianId   String?
+  technician     User? @relation("assigned", fields: [technicianId], references: [id])
+  serviceName    String
+  description    String
+  price          Numeric(10, 2)
+  status         WorkOrderStatus @default(OPEN)
+  scheduledAt    DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  events         WorkOrderEvent[]
+
+  @@index([organizationId, status])
+}
+
+model WorkOrderEvent {
+  id          String @id @onCreate(uuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  actorId     String
+  message     String
+  createdAt   DateTime @default(now())
+}
