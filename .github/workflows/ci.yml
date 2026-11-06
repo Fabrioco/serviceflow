@@ -1,0 +1,32 @@
+name: CI
+
+# Quando roda: a cada push na main e em qualquer pull request
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest        # máquina virtual limpa, a cada execução
+
+    steps:
+      # 1. Baixa o código do seu repositório para a máquina
+      - uses: actions/checkout@v4
+
+      # 2. Instala o pnpm (a versão vem do campo packageManager do package.json raiz)
+      - uses: pnpm/action-setup@v4
+
+      # 3. Instala o Node e guarda cache das dependências para acelerar as próximas execuções
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # 4. Instala as dependências exatamente como estão no pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      # 5. Verificações (a ordem mostra qual falhou)
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test
