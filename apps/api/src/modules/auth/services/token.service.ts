@@ -4,8 +4,8 @@ import type { Request } from 'express';
 
 export interface TokenPayload {
   sub: string;
-  name: string;
-  email: string;
+  organizationId: string;
+  role: string;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -18,8 +18,8 @@ export class TokenService {
   async generateToken(payload: TokenPayload): Promise<string> {
     return await this.jwt.signAsync({
       sub: payload.sub,
-      name: payload.name,
-      email: payload.email,
+      organizationId: payload.organizationId,
+      role: payload.role,
     });
   }
 }
