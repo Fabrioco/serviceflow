@@ -10,6 +10,8 @@ import { AuthResponseDto } from './dtos/auth-response.dto.js';
 import { db } from '../../prisma/db.js';
 import { HashService } from './services/hash.service.js';
 import { TokenService } from './services/token.service.js';
+import { LoginUserDto } from './dtos/login-user.dto.js';
+import { throwDeprecation } from 'process';
 
 @Injectable()
 export class AuthService {
@@ -52,13 +54,38 @@ export class AuthService {
       return { organization, user };
     });
 
-    const payload = {
-      sub: user.id,
-      name: user.name,
-      email: user.email,
-    };
+    return await this.BuildAuthResponse(user);
+  }
 
-    const accessToken = await this.token.generateToken(payload);
+  async login(dto: LoginUserDto): Promise<AuthResponseDto> {
+    const { password } = dto;
+    const email = dto.email.trim().toLowerCase();
+
+    const user = await this.prisma.db.User.where({ email }).first();
+
+    const isValid = user
+      ? await this.hash.comparePassword(dto.password, user.passwordHash)
+      : false;
+
+    if (!isValid || !user) {
+      throw new UnauthorizedException('Credentials incorrect');
+    }
+
+    return await this.BuildAuthResponse(user);
+  }
+
+  private async BuildAuthResponse(user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    organizationId: string;
+  }) {
+    const accessToken = await this.token.generateToken({
+      sub: user.id,
+      organizationId: user.organizationId,
+      role: user.role,
+    });
 
     return {
       accessToken,
@@ -67,7 +94,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
-        organizationId: organization.id,
+        organizationId: user.organizationId,
       },
     };
   }
