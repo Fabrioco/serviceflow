@@ -8,10 +8,10 @@ allowBuilds:
   workerd: false
   sharp: false
   unrs-resolver: false
-  argon2: set this to true or false
-
 permissions:
   '@prisma/orm-postgres':
     skills: false
+  argon2:
+    build: false
   prisma:
     skills: false
