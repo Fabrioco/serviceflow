@@ -1,9 +1,9 @@
 "use client";
-
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { loginAction, type LoginState } from "./actions";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const initialState: LoginState = {};
 
@@ -12,7 +12,6 @@ export function LoginForm() {
     loginAction,
     initialState,
   );
-  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <form action={formAction} noValidate className="space-y-5">
@@ -35,22 +34,12 @@ export function LoginForm() {
         error={state.errors?.email}
       />
 
-      <Input
+      <PasswordInput
         label="Senha"
         name="password"
-        type={showPassword ? "text" : "password"}
-        autoComplete="current-password"
-        placeholder="Sua senha"
+        autoComplete="new-password"
+        placeholder="Mínimo de 8 caracteres"
         error={state.errors?.password}
-        trailing={
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="h-9 rounded-md px-2.5 text-[13px] font-medium text-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
-          >
-            {showPassword ? "Ocultar" : "Mostrar"}
-          </button>
-        }
       />
 
       <Button type="submit" loading={pending} className="mt-2 w-full">
