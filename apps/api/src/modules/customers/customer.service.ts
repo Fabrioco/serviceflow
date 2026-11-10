@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { or } from '@prisma/orm-postgres/orm-client';
+import { CreateCustomerDto } from './dtos/create-customer.dto.js';
 
 @Injectable()
 export class CustomerService {
@@ -49,5 +50,33 @@ export class CustomerService {
         totalPages,
       },
     };
+  }
+
+  async createCustomer(dto: CreateCustomerDto, organizationId: string) {
+    const email = dto.email?.trim().toLowerCase() || null;
+    const phone = dto.phone.replace(/\D/g, ''); // só dígitos
+
+    const duplicate = await this.prisma.db.Customer.where({ organizationId })
+      .where((customer) =>
+        email
+          ? or(customer.email.eq(email), customer.phone.eq(phone))
+          : customer.phone.eq(phone),
+      )
+      .first();
+
+    if (duplicate) {
+      throw new ConflictException(
+        'Já existe um cliente com esse e-mail ou telefone na sua empresa.',
+      );
+    }
+
+    return this.prisma.db.Customer.create({
+      organizationId,
+      name: dto.name,
+      phone,
+      email,
+      address: dto.address ?? null,
+      notes: dto.notes ?? null,
+    });
   }
 }

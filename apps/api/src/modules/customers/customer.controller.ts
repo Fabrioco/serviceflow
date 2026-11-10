@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -15,6 +15,7 @@ import type { TokenPayload } from '../auth/services/token.service.js';
 import { CustomerService } from './customer.service.js';
 import { ListCustomersQueryDto } from './dtos/list-customers-query.dto.js';
 import { listCustomersResponseExample } from './dtos/list-customers-response.dto.js';
+import { CreateCustomerDto } from './dtos/create-customer.dto.js';
 
 @ApiTags('Clientes')
 @ApiBearerAuth()
@@ -45,5 +46,10 @@ export class CustomerController {
       query.limit,
       query.search,
     );
+  }
+
+  @Post('new')
+  create(@CurrentUser() user: TokenPayload, @Body() dto: CreateCustomerDto) {
+    return this.service.createCustomer(dto, user.organizationId);
   }
 }
