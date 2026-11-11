@@ -58,7 +58,6 @@ export class CustomerService {
   }
 
   async getOne(customerId: string, organizationId: string) {
-    console.log(customerId);
     const customer = await this.prisma.db.Customer.where({
       id: customerId,
       organizationId,
