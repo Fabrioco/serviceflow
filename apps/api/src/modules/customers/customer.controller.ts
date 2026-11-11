@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -90,11 +91,27 @@ export class CustomerController {
     required: true,
     example: '55ff6643-251a-4904-b414-296766f3164e',
   })
+
   update(
     @Body() dto: UpdateCustomerDto,
     @Param('customerId') customerId: string,
     @CurrentUser() user: TokenPayload,
   ) {
     return this.service.update(customerId, user.organizationId, dto);
+  }
+
+  @Delete(':customerId')
+  @ApiParam({
+    name: 'customerId',
+    description: 'Id do cliente',
+    type: 'string',
+    required: true,
+    example: '55ff6643-251a-4904-b414-296766f3164e',
+  })
+  delete(
+    @Param('customerId') customerId: string,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.service.delete(customerId, user.organizationId);
   }
 }
