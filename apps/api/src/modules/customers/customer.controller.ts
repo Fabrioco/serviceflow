@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -27,6 +28,7 @@ import { listCustomersResponseExample } from './dtos/list-customers-response.dto
 import { CreateCustomerDto } from './dtos/create-customer.dto.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { UseRoles } from '../../common/decorators/roles.decorator.js';
+import { UpdateCustomerDto } from './dtos/update-customer.dto.js';
 
 @ApiTags('Clientes')
 @ApiBearerAuth()
@@ -78,5 +80,21 @@ export class CustomerController {
   @Post('new')
   create(@CurrentUser() user: TokenPayload, @Body() dto: CreateCustomerDto) {
     return this.service.createCustomer(dto, user.organizationId);
+  }
+
+  @Patch(':customerId')
+  @ApiParam({
+    name: 'customerId',
+    description: 'Id do cliente',
+    type: 'string',
+    required: true,
+    example: '55ff6643-251a-4904-b414-296766f3164e',
+  })
+  update(
+    @Body() dto: UpdateCustomerDto,
+    @Param('customerId') customerId: string,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.service.update(customerId, user.organizationId, dto);
   }
 }
