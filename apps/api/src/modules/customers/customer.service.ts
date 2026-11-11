@@ -63,7 +63,6 @@ export class CustomerService {
       organizationId,
     }).first();
 
-
     if (!customer) {
       throw new NotFoundException('Cliente não encontrado.');
     }
@@ -133,6 +132,15 @@ export class CustomerService {
       id: customerId,
       organizationId,
     }).update(data);
+  }
+
+  async delete(customerId: string, organizationId: string) {
+    const customer = await this.getOne(customerId, organizationId);
+
+    return this.prisma.db.Customer.where({
+      id: customerId,
+      organizationId,
+    }).delete();
   }
 
   private async assertNotDuplicate(
