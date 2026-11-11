@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -6,6 +14,7 @@ import {
   ApiOkResponse,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
+  ApiParam,
 } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -16,10 +25,13 @@ import { CustomerService } from './customer.service.js';
 import { ListCustomersQueryDto } from './dtos/list-customers-query.dto.js';
 import { listCustomersResponseExample } from './dtos/list-customers-response.dto.js';
 import { CreateCustomerDto } from './dtos/create-customer.dto.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { UseRoles } from '../../common/decorators/roles.decorator.js';
 
 @ApiTags('Clientes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@UseRoles('ADMIN', 'OWNER')
 @Controller('customers')
 export class CustomerController {
   constructor(private readonly service: CustomerService) {}
@@ -46,6 +58,21 @@ export class CustomerController {
       query.limit,
       query.search,
     );
+  }
+
+  @Get(':customerId')
+  @ApiParam({
+    name: 'customerId',
+    description: 'Id do cliente',
+    type: 'string',
+    required: true,
+    example: '55ff6643-251a-4904-b414-296766f3164e',
+  })
+  getOne(
+    @Param('customerId') customerId: string,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.service.getOne(customerId, user.organizationId);
   }
 
   @Post('new')
