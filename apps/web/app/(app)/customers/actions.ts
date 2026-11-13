@@ -3,13 +3,17 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 
 export type Customer = {
+  address: string;
+  createdAt: string;
+  email: string;
   id: string;
   name: string;
+  notes: string;
+  organizationId: string;
   phone: string;
-  email?: string;
 };
 
-export const customers = cache(async () => {
+export const fetchCustomers = cache(async () => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
 
   const res = await fetch(`${process.env.API_URL}/customers`, {
@@ -17,5 +21,5 @@ export const customers = cache(async () => {
     cache: "no-store",
   });
 
-  return res.json()
+  return res.json();
 });
