@@ -3,29 +3,25 @@ import { Suspense } from "react";
 import { CustomerSearch } from "./customer-search";
 import { CustomersTable, type CustomerRow } from "./customers-table";
 import { Pagination } from "./pagination";
-import { customers } from "./actions";
+import { Customer, fetchCustomers } from "./actions";
 
 type SearchParams = Promise<{ search?: string; page?: string }>;
 
-// TEMPORÁRIO: dados de exemplo só para ver a tela. Apague quando ligar na API.
-const mock: CustomerRow[] = [
-  { id: "1", name: "Ana Souza", phone: "19999990000", email: "ana@email.com" },
-  {
-    id: "2",
-    name: "Maria Lima",
-    phone: "19988881122",
-    email: "maria.lima@email.com",
-  },
-  { id: "3", name: "Pedro Alves", phone: "11977773344", email: null },
-];
+type fetchCustomersResponse = {
+  data: Customer[];
+  meta: {
+    limit: number;
+    page: number;
+    total: number;
+    totalPages: number;
+  };
+};
 
 export default async function CustomersPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
-  const customersList = await customers();
-  console.log(customersList);
   return (
     <main className="mx-auto max-w-295 px-8 py-10 md:px-12">
       <header className="mb-6 flex items-center justify-between gap-4">
@@ -57,7 +53,8 @@ async function CustomersContent({
   const pageNumber = Math.max(1, Number(page) || 1);
 
   // TODO 1: buscar os clientes na API usando `search` e `pageNumber`
-  const customers = mock;
+  const res: fetchCustomersResponse = await fetchCustomers();
+  const customers = res.data;
   const hasMore = false;
 
   // TODO 2: montar os links de paginação, mantendo o termo da busca na URL
