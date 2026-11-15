@@ -6,6 +6,7 @@ import { HealthModule } from './modules/health/health.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CustomerModule } from './modules/customers/customer.module.js';
+import { WorkOrdersModule } from './modules/work-orders/work-orders.module.js';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CustomerModule } from './modules/customers/customer.module.js';
     ConfigModule.forRoot({ isGlobal: true }),
     AuthModule,
     CustomerModule,
+    WorkOrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
