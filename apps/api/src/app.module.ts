@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CustomerModule } from './modules/customers/customer.module.js';
 import { WorkOrdersModule } from './modules/work-orders/work-orders.module.js';
+import { TechniciansModule } from './modules/technicians/technicians.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { WorkOrdersModule } from './modules/work-orders/work-orders.module.js';
     AuthModule,
     CustomerModule,
     WorkOrdersModule,
+    TechniciansModule,
   ],
   controllers: [AppController],
   providers: [AppService],
