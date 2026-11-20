@@ -55,31 +55,19 @@ export async function editTechnicianAction(
 
   if (!token) redirect("/login");
 
-  // 4) Chamar a API
-  const body: {
-    name: string;
-    email: string;
-    password?: string;
-  } = {
-    name: values.name,
-    email: values.email,
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
   };
 
-  // Senha vazia significa manter a senha atual
-  if (password.trim()) {
-    body.password = password;
-  }
-
+  // 4) Atualizar nome e e-mail (o corpo não aceita senha neste endpoint)
   let res: Response;
 
   try {
     res = await fetch(`${process.env.API_URL}/technicians/${id}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
+      headers,
+      body: JSON.stringify(values),
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });
@@ -90,7 +78,7 @@ export async function editTechnicianAction(
     };
   }
 
-  // 5) Traduzir status
+  // 5) Traduzir status do perfil
   if (res.status === 401) redirect("/login");
 
   if (res.status === 404) {
@@ -104,21 +92,47 @@ export async function editTechnicianAction(
     };
   }
 
-  if (res.status === 400) {
+  if (!res.ok) {
     return {
       values,
       message: "Confira os dados informados e tente novamente.",
     };
   }
 
-  if (!res.ok) {
-    return {
-      values,
-      message: "Algo deu errado. Tente novamente em instantes.",
-    };
+  // 6) Atualizar senha separadamente, se informada
+  if (password.trim()) {
+    let resPwd: Response;
+
+    try {
+      resPwd = await fetch(`${process.env.API_URL}/technicians/${id}/password`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ password }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      return {
+        values,
+        message: "Não foi possível conectar ao servidor. Tente novamente.",
+      };
+    }
+
+    if (resPwd.status === 401) redirect("/login");
+
+    if (resPwd.status === 404) {
+      return { values, message: "Técnico não encontrado." };
+    }
+
+    if (!resPwd.ok) {
+      return {
+        values,
+        message: "Não foi possível redefinir a senha. Tente novamente.",
+      };
+    }
   }
 
-  // 6) Sucesso
+  // 7) Sucesso
   revalidatePath("/team");
   redirect("/team");
 }
