@@ -9,7 +9,7 @@ const links = [
   { href: "/dashboard", label: "Painel" },
   { href: "/customers", label: "Clientes" },
   // { href: "/orders", label: "Ordens de serviço" }, // descomente quando a tela existir
-  // { href: "/team", label: "Equipe" },
+  { href: "/team", label: "Equipe" },
 ];
 
 export function AppHeader(user: { name: string; role: string }) {
