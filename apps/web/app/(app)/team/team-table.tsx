@@ -58,7 +58,7 @@ export function TeamTable({
               </td>
               <td className="px-5 py-3.5 text-right">
                 <Link
-                  href={`/team/${t.id}`}
+                  href={`/team/${t.id}/edit`}
                   className="font-medium text-accent hover:underline"
                 >
                   Editar<span className="sr-only">, {t.name}</span>
