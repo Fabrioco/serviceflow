@@ -8,7 +8,7 @@ export default function NewTechnicianPage() {
   return (
     <main className="mx-auto max-w-xl px-8 py-10">
       <Link
-        href="/customers"
+        href="/team"
         className="text-sm font-medium text-accent hover:underline"
       >
         ← Equipes
