@@ -399,17 +399,17 @@ Com a aplicação em execução, acesse:
 
 ### Principais endpoints
 
-| Método             | Endpoint             | Descrição                                        | Autenticação |
-| ------------------ | -------------------- | ------------------------------------------------ | ------------ |
-| `GET`              | `/api`               | Rota inicial da API.                             | Não          |
-| `GET`              | `/api/health`        | Verifica se a API está respondendo.              | Não          |
-| `GET`              | `/api/health/db`     | Verifica a conexão com o banco.                  | Não          |
-| `POST`             | `/api/auth/register` | Cadastra uma organização e seu proprietário.     | Não          |
-| `POST`             | `/api/auth/login`    | Autentica o usuário.                             | Não          |
-| `GET`              | `/api/me`            | Retorna os dados do usuário autenticado.         | Sim          |
-| `/api/customers`   |                      | Operações de gerenciamento de clientes.          | Sim          |
-| `/api/technicians` |                      | Operações de gerenciamento de técnicos.          | Sim          |
-| `/api/work-orders` |                      | Operações de gerenciamento de ordens de serviço. | Sim          |
+| Método | Endpoint             | Descrição                                        | Autenticação |
+| ------ | -------------------- | ------------------------------------------------ | ------------ |
+| `GET`  | `/api`               | Rota inicial da API.                             | Não          |
+| `GET`  | `/api/health`        | Verifica se a API está respondendo.              | Não          |
+| `GET`  | `/api/health/db`     | Verifica a conexão com o banco.                  | Não          |
+| `POST` | `/api/auth/register` | Cadastra uma organização e seu proprietário.     | Não          |
+| `POST` | `/api/auth/login`    | Autentica o usuário.                             | Não          |
+| `GET`  | `/api/me`            | Retorna os dados do usuário autenticado.         | Sim          |
+| `POST` | `/api/customers`     | Operações de gerenciamento de clientes.          | Sim          |
+| `POST` | `/api/technicians`   | Operações de gerenciamento de técnicos.          | Sim          |
+| `POST` | `/api/work-orders`   | Operações de gerenciamento de ordens de serviço. | Sim          |
 
 As rotas de gerenciamento utilizam o contexto da organização autenticada para aplicar as regras de isolamento e autorização.
 
