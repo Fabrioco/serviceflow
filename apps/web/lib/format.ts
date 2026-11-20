@@ -7,3 +7,12 @@ export function formatPhone(digits: string) {
     return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return digits;
 }
+
+export function formatDate(date: Date | string): string {
+  return new Date(date).toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
