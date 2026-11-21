@@ -86,7 +86,7 @@ O desenvolvimento segue uma abordagem incremental, priorizando os recursos essen
 
 - Máquina de estados das ordens de serviço.
 - Histórico de alterações e timeline de eventos.
-- Dashboard operacional e financeiro.
+- **Dashboard operacional e financeiro.** ✅
 - Indicadores de produtividade e faturamento.
 
 > O escopo da V1 prioriza a aplicação web. A interface deve funcionar também no navegador do celular, sem exigir a instalação de um aplicativo nativo.
@@ -410,6 +410,7 @@ Com a aplicação em execução, acesse:
 | `POST` | `/api/customers`     | Operações de gerenciamento de clientes.          | Sim          |
 | `POST` | `/api/technicians`   | Operações de gerenciamento de técnicos.          | Sim          |
 | `POST` | `/api/work-orders`   | Operações de gerenciamento de ordens de serviço. | Sim          |
+| `GET`  | `/api/work-orders/dashboard/summary` | Obtém resumo do dashboard de ordens de serviço. | Sim          |
 
 As rotas de gerenciamento utilizam o contexto da organização autenticada para aplicar as regras de isolamento e autorização.
 
@@ -452,7 +453,7 @@ O desenvolvimento da V1 está organizado em etapas para manter o escopo controla
 | Semana 2 | Gerenciamento de clientes e isolamento multi-tenant.                              | Concluída          |
 | Semana 3 | Gerenciamento de ordens de serviço e atribuição de técnicos.                      | Concluída          |
 | Semana 4 | Máquina de estados e histórico de eventos das ordens.                             | Em desenvolvimento |
-| Semana 5 | Dashboard operacional e financeiro.                                               | Planejada          |
+| Semana 5 | Dashboard operacional e financeiro.                                               | Concluída          |
 | Semana 6 | Revisão, testes, documentação, dados de demonstração e lançamento da V1.          | Planejada          |
 
 ### Evoluções futuras

@@ -342,6 +342,166 @@ export async function createWorkOrderAction(
   return createWorkOrderFormAction(formData) as Promise<WorkOrderState>;
 }
 
+// ---------- Dashboard ----------
+
+export type DashboardAppointment = {
+  id: string;
+  code: string;
+  scheduledAt: string;
+  isToday: boolean;
+  customerName: string;
+  serviceName: string;
+  technicianName: string | null;
+  status: string;
+};
+
+export type DashboardActivity = {
+  id: string;
+  message: string;
+  orderId: string;
+  orderCode: string;
+  actorName: string | null;
+  createdAt: string;
+};
+
+export type DashboardData = {
+  open: number;
+  scheduledToday: number;
+  inProgress: number;
+  completedThisMonth: number;
+  revenueThisMonth: number;
+  upcoming: DashboardAppointment[];
+  activity: DashboardActivity[];
+  partial: boolean;
+};
+
+const TZ = "America/Sao_Paulo";
+const PAGE_SIZE = 50;
+
+// Helper to get date key safely (avoids new Date() at module level issues)
+const getDayKey = (value: string | Date) =>
+  new Date(value).toLocaleDateString("en-CA", { timeZone: TZ });
+
+const orderCode = (id: string) => id.slice(-4).toUpperCase();
+
+const getScheduledTime = (scheduledAt: string | null | undefined) =>
+  scheduledAt ? new Date(scheduledAt).getTime() : 0;
+
+// Busca todas as páginas de um status (até 5 páginas), em paralelo
+async function fetchAllByStatus(status: string) {
+  const first = await fetchWorkOrders({ status, page: 1, limit: PAGE_SIZE });
+  const lastPage = Math.min(first.meta.totalPages, 5);
+
+  const others = await Promise.all(
+    Array.from({ length: Math.max(0, lastPage - 1) }, (_, index) =>
+      fetchWorkOrders({ status, page: index + 2, limit: PAGE_SIZE }),
+    ),
+  );
+
+  return {
+    total: first.meta.total,
+    rows: [first, ...others].flatMap((page) => page.data),
+    complete: first.meta.totalPages <= 5,
+  };
+}
+
+// ---------- Server Action principal do dashboard ----------
+
+export async function fetchDashboard(): Promise<DashboardData> {
+  const now = new Date();
+  const today = now.toLocaleDateString("en-CA", { timeZone: TZ });
+  const month = today.slice(0, 7);
+  const startOfToday = new Date(`${today}T00:00:00-03:00`).getTime();
+
+  const [openRes, scheduledRes, inProgressRes, completedRes, latestRes] =
+    await Promise.all([
+      fetchWorkOrders({ status: "OPEN", limit: 1 }),
+      fetchAllByStatus("SCHEDULED"),
+      fetchAllByStatus("IN_PROGRESS"),
+      fetchAllByStatus("COMPLETED"),
+      fetchWorkOrders({ limit: 5 }),
+    ]);
+
+  // ---------- números ----------
+  const scheduledToday = scheduledRes.rows.filter(
+    (order: WorkOrder) =>
+      order.scheduledAt && getDayKey(order.scheduledAt) === today,
+  ).length;
+
+  const completedThisMonthRows = completedRes.rows.filter(
+    (order: WorkOrder) =>
+      order.completedAt && getDayKey(order.completedAt).slice(0, 7) === month,
+  );
+
+  const revenueThisMonth = completedThisMonthRows.reduce(
+    (sum: number, order: WorkOrder) => sum + Number(order.price ?? 0),
+    0,
+  );
+
+  // ---------- próximos atendimentos ----------
+  const upcomingSources = [...scheduledRes.rows, ...inProgressRes.rows]
+    .filter(
+      (order: WorkOrder) =>
+        order.scheduledAt &&
+        getScheduledTime(order.scheduledAt) >= startOfToday,
+    )
+    .sort(
+      (a: WorkOrder, b: WorkOrder) =>
+        getScheduledTime(a.scheduledAt!) - getScheduledTime(b.scheduledAt!),
+    )
+    .slice(0, 6)
+    .map((order: WorkOrder) => ({
+      id: order.id,
+      code: orderCode(order.id),
+      scheduledAt: order.scheduledAt!,
+      isToday: getDayKey(order.scheduledAt!) === today,
+      customerName: order.customer?.name || "",
+      serviceName: order.serviceName || "",
+      technicianName: order.technician?.name ?? null,
+      status: order.status,
+    }));
+
+  // ---------- atividade recente ----------
+  const details = await Promise.all(
+    latestRes.data.map((order: WorkOrder) =>
+      fetchWorkOrder(order.id).catch(() => null),
+    ),
+  );
+
+  const activity: DashboardActivity[] = details
+    .flatMap((order: WorkOrderDetail | null) =>
+      order
+        ? order.events.map((event) => ({
+            id: event.id,
+            message: event.message,
+            orderId: order.id,
+            orderCode: orderCode(order.id),
+            actorName: event.actorName,
+            createdAt: event.createdAt,
+          }))
+        : [],
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, 5);
+
+  return {
+    open: openRes.meta.total,
+    scheduledToday,
+    inProgress: inProgressRes.total,
+    completedThisMonth: completedThisMonthRows.length,
+    revenueThisMonth,
+    upcoming: upcomingSources,
+    activity,
+    partial:
+      !scheduledRes.complete ||
+      !inProgressRes.complete ||
+      !completedRes.complete,
+  };
+}
+
 export async function updateWorkOrderAction(
   id: string,
   _prev: WorkOrderState | null,
