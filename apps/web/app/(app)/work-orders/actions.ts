@@ -379,7 +379,8 @@ const TZ = "America/Sao_Paulo";
 const PAGE_SIZE = 50;
 
 // Helper to get date key safely (avoids new Date() at module level issues)
-const getDayKey = (value: string | Date) => new Date(value).toLocaleDateString("en-CA", { timeZone: TZ });
+const getDayKey = (value: string | Date) =>
+  new Date(value).toLocaleDateString("en-CA", { timeZone: TZ });
 
 const orderCode = (id: string) => id.slice(-4).toUpperCase();
 
@@ -407,61 +408,70 @@ async function fetchAllByStatus(status: string) {
 // ---------- Server Action principal do dashboard ----------
 
 export async function fetchDashboard(): Promise<DashboardData> {
-  // Calculate dates inside the server action to avoid prerendering issues
   const now = new Date();
   const today = now.toLocaleDateString("en-CA", { timeZone: TZ });
   const month = today.slice(0, 7);
   const startOfToday = new Date(`${today}T00:00:00-03:00`).getTime();
 
-  const [openRes, scheduledRes, inProgressRes, completedRes, latestRes] = await Promise.all([
-    fetchWorkOrders({ status: "OPEN", limit: 1 }),
-    fetchAllByStatus("SCHEDULED"),
-    fetchAllByStatus("IN_PROGRESS"),
-    fetchAllByStatus("COMPLETED"),
-    fetchWorkOrders({ limit: 5 }),
-  ]);
+  const [openRes, scheduledRes, inProgressRes, completedRes, latestRes] =
+    await Promise.all([
+      fetchWorkOrders({ status: "OPEN", limit: 1 }),
+      fetchAllByStatus("SCHEDULED"),
+      fetchAllByStatus("IN_PROGRESS"),
+      fetchAllByStatus("COMPLETED"),
+      fetchWorkOrders({ limit: 5 }),
+    ]);
 
   // ---------- números ----------
   const scheduledToday = scheduledRes.rows.filter(
-    (order: any) => order.scheduledAt && getDayKey(order.scheduledAt) === today,
+    (order: WorkOrder) =>
+      order.scheduledAt && getDayKey(order.scheduledAt) === today,
   ).length;
 
   const completedThisMonthRows = completedRes.rows.filter(
-    (order: any) =>
+    (order: WorkOrder) =>
       order.completedAt && getDayKey(order.completedAt).slice(0, 7) === month,
   );
+
   const revenueThisMonth = completedThisMonthRows.reduce(
-    (sum: number, order: any) => sum + Number(order.price ?? 0),
+    (sum: number, order: WorkOrder) => sum + Number(order.price ?? 0),
     0,
   );
 
-  // ---------- próximos atendimentos (de hoje em diante) ----------
+  // ---------- próximos atendimentos ----------
   const upcomingSources = [...scheduledRes.rows, ...inProgressRes.rows]
     .filter(
-      (order: any) => order.scheduledAt && getScheduledTime(order.scheduledAt) >= startOfToday,
+      (order: WorkOrder) =>
+        order.scheduledAt &&
+        getScheduledTime(order.scheduledAt) >= startOfToday,
     )
-    .sort((a: any, b: any) => getScheduledTime(a.scheduledAt) - getScheduledTime(b.scheduledAt))
+    .sort(
+      (a: WorkOrder, b: WorkOrder) =>
+        getScheduledTime(a.scheduledAt!) - getScheduledTime(b.scheduledAt!),
+    )
     .slice(0, 6)
-    .map((order: any) => ({
+    .map((order: WorkOrder) => ({
       id: order.id,
       code: orderCode(order.id),
-      scheduledAt: order.scheduledAt as string,
-      isToday: getDayKey(order.scheduledAt as string) === today,
+      scheduledAt: order.scheduledAt!,
+      isToday: getDayKey(order.scheduledAt!) === today,
       customerName: order.customer?.name || "",
       serviceName: order.serviceName || "",
       technicianName: order.technician?.name ?? null,
       status: order.status,
     }));
 
-  // ---------- atividade recente (histórico das OS mais recentes) ----------
+  // ---------- atividade recente ----------
   const details = await Promise.all(
-    latestRes.data.map((order: any) => fetchWorkOrder(order.id).catch(() => null)),
+    latestRes.data.map((order: WorkOrder) =>
+      fetchWorkOrder(order.id).catch(() => null),
+    ),
   );
 
   const activity: DashboardActivity[] = details
-    .flatMap((order: any | null) =>
+    .flatMap((order: WorkOrderDetail | null) =>
       order
-        ? order.events?.map((event: any) => ({
+        ? order.events.map((event) => ({
             id: event.id,
             message: event.message,
             orderId: order.id,
@@ -471,7 +481,10 @@ export async function fetchDashboard(): Promise<DashboardData> {
           }))
         : [],
     )
-    .sort((a: any, b: any) => +new Date(b.createdAt) - +new Date(a.createdAt))
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
     .slice(0, 5);
 
   return {
@@ -482,7 +495,10 @@ export async function fetchDashboard(): Promise<DashboardData> {
     revenueThisMonth,
     upcoming: upcomingSources,
     activity,
-    partial: !scheduledRes.complete || !inProgressRes.complete || !completedRes.complete,
+    partial:
+      !scheduledRes.complete ||
+      !inProgressRes.complete ||
+      !completedRes.complete,
   };
 }
 
