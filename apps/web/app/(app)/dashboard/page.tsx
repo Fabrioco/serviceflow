@@ -1,7 +1,6 @@
+import { connection } from "next/server";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
-import { logoutAction } from "../actions";
 import { fetchDashboard } from "./actions";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -96,6 +95,7 @@ const metrics = [
 ] as const;
 
 export default async function DashboardPage() {
+  await connection();
   const [user, dashboard] = await Promise.all([
     requireUser(),
     fetchDashboard(),
