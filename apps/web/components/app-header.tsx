@@ -8,7 +8,7 @@ import { logoutAction } from "@/app/(app)/actions";
 const links = [
   { href: "/dashboard", label: "Painel" },
   { href: "/customers", label: "Clientes" },
-  // { href: "/orders", label: "Ordens de serviço" }, // descomente quando a tela existir
+  { href: "/work-orders", label: "Ordens de serviço" },
   { href: "/team", label: "Equipe" },
 ];
 
