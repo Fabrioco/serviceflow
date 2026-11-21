@@ -8,6 +8,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AssignTechnicianDto } from './dtos/assign-technician.dto.js';
 import { CreateWorkOrderDto } from './dtos/create-work-order.dto.js';
 import { ListWorkOrdersQueryDto } from './dtos/list-work-orders-query.dto.js';
+import { ScheduleWorkOrderDto } from './dtos/schedule-work-order.dto.js';
+import { UpdateWorkOrderDto } from './dtos/update-work-order.dto.js';
 import {
   WorkOrderDetailResponseDto,
   WorkOrderListResponseDto,
@@ -40,9 +42,14 @@ const formatDateTime = (date: Date) =>
     dateStyle: 'short',
     timeStyle: 'short',
   });
+const toMinute = (date: Date) => Math.floor(date.getTime() / 60_000);
 
 const TOLERANCE_MS = 5 * 60 * 1000;
 const TECHNICIAN_CHANGE_ALLOWED: WorkOrderStatus[] = ['OPEN', 'SCHEDULED'];
+const EDITABLE: WorkOrderStatus[] = ['OPEN', 'SCHEDULED'];
+const CANCELABLE: WorkOrderStatus[] = ['OPEN', 'SCHEDULED', 'IN_PROGRESS'];
+const STARTABLE: WorkOrderStatus[] = ['OPEN', 'SCHEDULED'];
+const COMPLETABLE: WorkOrderStatus[] = ['IN_PROGRESS'];
 
 @Injectable()
 export class WorkOrdersService {
@@ -196,6 +203,174 @@ export class WorkOrdersService {
         createdAt: new Date(e.createdAt).toISOString(),
       })),
     };
+  }
+
+  // ---------- editar ----------
+  async update(
+    id: string,
+    dto: UpdateWorkOrderDto,
+    actor: TokenPayload,
+  ): Promise<WorkOrderResponseDto> {
+    const { organizationId } = actor;
+    const order = await this.getOrder(id, actor);
+
+    if (!EDITABLE.includes(order.status)) {
+      throw new ConflictException(
+        'Só é possível editar ordens abertas ou agendadas.',
+      );
+    }
+
+    const customer = await this.getCustomer(order.customerId, organizationId);
+    const messages: string[] = [];
+    const data: Record<string, unknown> = {};
+
+    if (
+      dto.serviceName !== undefined &&
+      dto.serviceName !== order.serviceName
+    ) {
+      data.serviceName = dto.serviceName;
+      messages.push('Serviço alterado.');
+    }
+    if (
+      dto.description !== undefined &&
+      dto.description !== order.description
+    ) {
+      data.description = dto.description;
+      messages.push('Descrição alterada.');
+    }
+    if (
+      dto.price !== undefined &&
+      dto.price.toFixed(2) !== String(order.price)
+    ) {
+      data.price = dto.price.toFixed(2);
+      messages.push('Valor alterado.');
+    }
+
+    let technician: Summary | null = null;
+    if (order.technicianId) {
+      technician =
+        (await this.usersById(organizationId, [order.technicianId])).get(
+          order.technicianId,
+        ) ?? null;
+    }
+
+    // técnico: undefined = não mexe | null = remove | id = troca
+    if (dto.technicianId === null) {
+      if (order.technicianId) {
+        data.technicianId = null;
+        messages.push(
+          technician
+            ? `Técnico ${technician.name} removido.`
+            : 'Técnico removido.',
+        );
+        technician = null;
+      }
+    } else if (dto.technicianId && dto.technicianId !== order.technicianId) {
+      const next = await this.getTechnician(dto.technicianId, organizationId);
+      data.technicianId = next.id;
+      messages.push(
+        technician
+          ? `Técnico alterado de ${technician.name} para ${next.name}.`
+          : `Técnico ${next.name} atribuído.`,
+      );
+      technician = next;
+    }
+
+    // agendamento: undefined = não mexe | null = remove | data = só valida se mudou
+    if (dto.scheduledAt === null) {
+      if (order.scheduledAt) {
+        data.scheduledAt = null;
+        data.status = 'OPEN';
+        messages.push('Agendamento removido.');
+      }
+    } else if (dto.scheduledAt) {
+      const unchanged =
+        order.scheduledAt &&
+        toMinute(new Date(dto.scheduledAt)) ===
+          toMinute(new Date(order.scheduledAt));
+
+      if (!unchanged) {
+        const scheduledAt = this.parseSchedule(dto.scheduledAt); // só valida quando mudou
+        data.scheduledAt = scheduledAt;
+        data.status = 'SCHEDULED';
+        messages.push(
+          `Atendimento agendado para ${formatDateTime(scheduledAt)}.`,
+        );
+      }
+    }
+
+    // nada mudou: não registra histórico
+    if (messages.length === 0)
+      return this.toResponse(order, customer, technician);
+
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.orm.public.WorkOrder.where({
+        id: order.id,
+        organizationId,
+        status: order.status, // evita corrida: só atualiza se o status não mudou
+      }).update(data);
+
+      if (!result)
+        throw new ConflictException(
+          'A ordem foi alterada por outra pessoa. Recarregue.',
+        );
+
+      const base = Date.now();
+      for (const [index, message] of messages.entries()) {
+        await tx.orm.public.WorkOrderEvent.create({
+          workOrderId: order.id,
+          actorId: actor.sub,
+          message,
+          createdAt: new Date(base + index),
+        });
+      }
+      return result;
+    });
+
+    return this.toResponse(updated, customer, technician);
+  }
+
+  // ---------- cancelar ----------
+  cancel(id: string, actor: TokenPayload) {
+    return this.transition(id, actor, {
+      from: CANCELABLE,
+      to: 'CANCELED',
+      message: 'Ordem de serviço cancelada.',
+      conflictMessage: 'Não é possível cancelar esta ordem.',
+    });
+  }
+
+  // ---------- iniciar ----------
+  start(id: string, actor: TokenPayload) {
+    return this.transition(id, actor, {
+      from: STARTABLE,
+      to: 'IN_PROGRESS',
+      message: 'Atendimento iniciado.',
+      conflictMessage: 'Só é possível iniciar ordens abertas ou agendadas.',
+    });
+  }
+
+  // ---------- reagendar ----------
+  reschedule(id: string, dto: ScheduleWorkOrderDto, actor: TokenPayload) {
+    const scheduledAt = this.parseSchedule(dto.scheduledAt);
+    return this.transition(id, actor, {
+      from: EDITABLE,
+      to: 'SCHEDULED',
+      data: { scheduledAt },
+      message: `Atendimento reagendado para ${formatDateTime(scheduledAt)}.`,
+      conflictMessage: 'Só é possível reagendar ordens abertas ou agendadas.',
+    });
+  }
+
+  // ---------- concluir ----------
+  complete(id: string, actor: TokenPayload) {
+    return this.transition(id, actor, {
+      from: COMPLETABLE,
+      to: 'COMPLETED',
+      data: { completedAt: new Date() },
+      message: 'Ordem de serviço concluída.',
+      conflictMessage: 'Só é possível concluir ordens em andamento.',
+    });
   }
 
   // ---------- atribuir técnico ----------
@@ -354,5 +529,54 @@ export class WorkOrdersService {
         ? { id: technician.id, name: technician.name }
         : null,
     };
+  }
+
+  // muda o status de forma atômica e registra o histórico
+  private async transition(
+    id: string,
+    actor: TokenPayload,
+    opts: {
+      from: WorkOrderStatus[];
+      to: WorkOrderStatus;
+      message: string;
+      conflictMessage: string;
+      data?: Record<string, unknown>;
+    },
+  ): Promise<WorkOrderResponseDto> {
+    const { organizationId } = actor;
+    const order = await this.getOrder(id, actor);
+
+    if (!opts.from.includes(order.status)) {
+      throw new ConflictException(opts.conflictMessage);
+    }
+
+    const customer = await this.getCustomer(order.customerId, organizationId);
+    const technician = order.technicianId
+      ? ((await this.usersById(organizationId, [order.technicianId])).get(
+          order.technicianId,
+        ) ?? null)
+      : null;
+
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.orm.public.WorkOrder.where({
+        id: order.id,
+        organizationId,
+        status: order.status,
+      }).update({ status: opts.to, ...opts.data });
+
+      if (!result)
+        throw new ConflictException(
+          'A ordem foi alterada por outra pessoa. Recarregue.',
+        );
+
+      await tx.orm.public.WorkOrderEvent.create({
+        workOrderId: order.id,
+        actorId: actor.sub,
+        message: opts.message,
+      });
+      return result;
+    });
+
+    return this.toResponse(updated, customer, technician);
   }
 }

@@ -129,7 +129,11 @@ export async function createWorkOrderFormAction(formData: FormData) {
   if (values.description.length < 3) {
     errors.description = "A descrição precisa ter pelo menos 3 caracteres.";
   }
-  if (!values.price || isNaN(Number(values.price)) || Number(values.price) < 0) {
+  if (
+    !values.price ||
+    isNaN(Number(values.price)) ||
+    Number(values.price) < 0
+  ) {
     errors.price = "Informe um valor válido.";
   }
 
@@ -160,7 +164,10 @@ export async function createWorkOrderFormAction(formData: FormData) {
   }
 
   if (!res.ok) {
-    return { values, message: "Confira os dados informados e tente novamente." };
+    return {
+      values,
+      message: "Confira os dados informados e tente novamente.",
+    };
   }
 
   revalidatePath("/work-orders");
@@ -183,7 +190,11 @@ export async function updateWorkOrderFormAction(
 
   const errors: WorkOrderState["errors"] = {};
   if (!values.serviceName) errors.serviceName = "Informe o serviço.";
-  if (!values.price || isNaN(Number(values.price)) || Number(values.price) < 0) {
+  if (
+    !values.price ||
+    isNaN(Number(values.price)) ||
+    Number(values.price) < 0
+  ) {
     errors.price = "Informe um valor válido.";
   }
 
@@ -221,7 +232,9 @@ export async function updateWorkOrderFormAction(
   redirect(`/work-orders/${id}`);
 }
 
-export async function cancelWorkOrderFormAction(formData: FormData): Promise<void> {
+export async function cancelWorkOrderFormAction(
+  formData: FormData,
+): Promise<void> {
   const id = String(formData.get("id") ?? "");
   const h = await headers();
 
@@ -243,7 +256,9 @@ export async function cancelWorkOrderFormAction(formData: FormData): Promise<voi
   redirect("/work-orders");
 }
 
-export async function startWorkOrderFormAction(formData: FormData): Promise<void> {
+export async function startWorkOrderFormAction(
+  formData: FormData,
+): Promise<void> {
   const id = String(formData.get("id") ?? "");
   const h = await headers();
 
@@ -266,7 +281,9 @@ export async function startWorkOrderFormAction(formData: FormData): Promise<void
   redirect(`/work-orders/${id}`);
 }
 
-export async function reScheduleWorkOrderFormAction(formData: FormData): Promise<void> {
+export async function reScheduleWorkOrderFormAction(
+  formData: FormData,
+): Promise<void> {
   const id = String(formData.get("id") ?? "");
   const scheduledAt = String(formData.get("scheduledAt") ?? "");
   const h = await headers();
@@ -277,6 +294,31 @@ export async function reScheduleWorkOrderFormAction(formData: FormData): Promise
       method: "PATCH",
       headers: h,
       body: JSON.stringify({ scheduledAt }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    return;
+  }
+
+  if (!res.ok) return;
+
+  revalidatePath("/work-orders");
+  revalidatePath(`/work-orders/${id}`);
+  redirect(`/work-orders/${id}`);
+}
+
+export async function completeWorkOrderFormAction(
+  formData: FormData,
+): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  const h = await headers();
+
+  let res: Response;
+  try {
+    res = await fetch(`${process.env.API_URL}/work-orders/${id}/complete`, {
+      method: "PATCH",
+      headers: h,
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });

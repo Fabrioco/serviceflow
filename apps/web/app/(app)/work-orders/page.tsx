@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { fetchWorkOrders, type WorkOrder } from "./actions";
+import { fetchWorkOrders } from "./actions";
 import { Pagination } from "../customers/pagination";
 
 type SearchParams = Promise<{
@@ -9,7 +9,46 @@ type SearchParams = Promise<{
   status?: string;
 }>;
 
-export default async function WorkOrdersPage({
+const STATUSES = [
+  "OPEN",
+  "SCHEDULED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CANCELED",
+] as const;
+
+const statusLabel: Record<string, string> = {
+  OPEN: "Aberta",
+  SCHEDULED: "Agendada",
+  IN_PROGRESS: "Em andamento",
+  COMPLETED: "Concluída",
+  CANCELED: "Cancelada",
+};
+
+const statusColor: Record<string, string> = {
+  OPEN: "bg-amber-50 text-amber-700 border-amber-100",
+  SCHEDULED: "bg-blue-50 text-blue-700 border-blue-100",
+  IN_PROGRESS: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  CANCELED: "bg-rose-50 text-rose-700 border-rose-100",
+};
+
+// sempre em horário de Brasília e 24h, independente do fuso do servidor
+const formatDateTime = (iso: string) =>
+  new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
+// só aceita status conhecidos (um valor inválido faria a API responder 400)
+const parseStatus = (value?: string) => STATUSES.find((s) => s === value);
+
+export default function WorkOrdersPage({
   searchParams,
 }: {
   searchParams: SearchParams;
@@ -33,13 +72,9 @@ export default async function WorkOrdersPage({
         </Link>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 mb-8">
-        <StatCard title="Todas" value="—" subtitle="carregando" />
-        <StatCard title="Abertas" value="—" subtitle="carregando" />
-        <StatCard title="Agendadas" value="—" subtitle="carregando" />
-        <StatCard title="Em andamento" value="—" subtitle="carregando" />
-        <StatCard title="Concluídas" value="—" subtitle="carregando" />
-      </div>
+      <Suspense fallback={<StatsSkeleton />}>
+        <Stats searchParams={searchParams} />
+      </Suspense>
 
       <Suspense fallback={<ListSkeleton />}>
         <WorkOrdersContent searchParams={searchParams} />
@@ -48,40 +83,79 @@ export default async function WorkOrdersPage({
   );
 }
 
+// ---------- cards de resumo (total de cada status vem do meta.total da API) ----------
+
+const STAT_CARDS: Array<{
+  title: string;
+  status?: (typeof STATUSES)[number];
+  subtitle: string;
+}> = [
+  { title: "Todas", subtitle: "no total" },
+  { title: "Abertas", status: "OPEN", subtitle: "sem agendamento" },
+  { title: "Agendadas", status: "SCHEDULED", subtitle: "com data marcada" },
+  { title: "Em andamento", status: "IN_PROGRESS", subtitle: "em atendimento" },
+  { title: "Concluídas", status: "COMPLETED", subtitle: "finalizadas" },
+];
+
+async function Stats({ searchParams }: { searchParams: SearchParams }) {
+  const current = parseStatus((await searchParams).status);
+
+  // limit 1: só interessa o total
+  const totals = await Promise.all(
+    STAT_CARDS.map((card) =>
+      fetchWorkOrders({ status: card.status, limit: 1 }).then(
+        (res) => res.meta.total,
+      ),
+    ),
+  );
+
+  return (
+    <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      {STAT_CARDS.map((card, index) => (
+        <StatCard
+          key={card.title}
+          title={card.title}
+          value={String(totals[index])}
+          subtitle={card.subtitle}
+          href={
+            card.status ? `/work-orders?status=${card.status}` : "/work-orders"
+          }
+          active={card.status === current}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ---------- lista ----------
+
 async function WorkOrdersContent({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
-  const { search, page, status } = await searchParams;
+  const { search, page, status: rawStatus } = await searchParams;
+  const status = parseStatus(rawStatus);
   const pageNumber = Math.max(1, Number(page) || 1);
 
-  const res: Awaited<ReturnType<typeof fetchWorkOrders>> =
-    await fetchWorkOrders({ search, page: pageNumber, status });
-
-  const orders = res.data;
-  const { totalPages } = res.meta;
+  const { data: orders, meta } = await fetchWorkOrders({
+    search,
+    page: pageNumber,
+    status,
+  });
 
   function getPageHref(targetPage: number) {
     const params = new URLSearchParams();
     if (search?.trim()) params.set("search", search.trim());
-    if (status?.trim()) params.set("status", status.trim());
+    if (status) params.set("status", status);
     params.set("page", String(targetPage));
     return `/work-orders?${params.toString()}`;
   }
 
-  const statusColor: Record<string, string> = {
-    OPEN: "bg-amber-50 text-amber-700 border-amber-100",
-    SCHEDULED: "bg-blue-50 text-blue-700 border-blue-100",
-    IN_PROGRESS: "bg-indigo-50 text-indigo-700 border-indigo-100",
-    COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    CANCELED: "bg-rose-50 text-rose-700 border-rose-100",
-  };
-
   return (
     <>
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <form role="search" className="flex gap-2 sm:w-[320px]">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <form role="search" className="flex gap-2 sm:w-[420px]">
           <input
             name="search"
             defaultValue={search ?? ""}
@@ -94,11 +168,11 @@ async function WorkOrdersContent({
             className="h-11 rounded-lg border border-border bg-white px-3.5 text-[15px] text-ink focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent focus:ring-offset-1"
           >
             <option value="">Todos os status</option>
-            <option value="OPEN">Aberta</option>
-            <option value="SCHEDULED">Agendada</option>
-            <option value="IN_PROGRESS">Em andamento</option>
-            <option value="COMPLETED">Concluída</option>
-            <option value="CANCELED">Cancelada</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {statusLabel[s]}
+              </option>
+            ))}
           </select>
           <button
             type="submit"
@@ -109,7 +183,7 @@ async function WorkOrdersContent({
         </form>
       </div>
 
-      <div className="rounded-xl border border-border bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-border bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-gray-50">
@@ -128,7 +202,7 @@ async function WorkOrdersContent({
               <th className="px-6 py-4 text-[13px] font-medium text-muted">
                 Data
               </th>
-              <th className="px-6 py-4 text-[13px] font-medium text-muted text-right">
+              <th className="px-6 py-4 text-right text-[13px] font-medium text-muted">
                 Valor
               </th>
               <th className="px-6 py-4 text-[13px] font-medium text-muted">
@@ -163,19 +237,16 @@ async function WorkOrdersContent({
                       <span className="text-muted">—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-ink">
+                  <td className="whitespace-nowrap px-6 py-4 text-ink">
                     {order.scheduledAt ? (
-                      <span>
-                        {new Date(order.scheduledAt).toLocaleString("pt-BR", {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </span>
+                      <time dateTime={order.scheduledAt}>
+                        {formatDateTime(order.scheduledAt)}
+                      </time>
                     ) : (
                       <span className="text-muted">—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right text-ink">
+                  <td className="whitespace-nowrap px-6 py-4 text-right text-ink">
                     R${" "}
                     {Number(order.price).toLocaleString("pt-BR", {
                       minimumFractionDigits: 2,
@@ -184,15 +255,12 @@ async function WorkOrdersContent({
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold leading-5 ${
-                        statusColor[order.status] ||
+                      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold leading-5 ${
+                        statusColor[order.status] ??
                         "bg-gray-50 text-gray-700 border-gray-100"
                       }`}
                     >
-                      {order.status
-                        .replace("_", " ")
-                        .toLowerCase()
-                        .replace(/\b\w/g, (l) => l.toUpperCase())}
+                      {statusLabel[order.status] ?? order.status}
                     </span>
                   </td>
                 </tr>
@@ -206,29 +274,52 @@ async function WorkOrdersContent({
         page={pageNumber}
         previousHref={pageNumber > 1 ? getPageHref(pageNumber - 1) : undefined}
         nextHref={
-          pageNumber < res.meta.totalPages
-            ? getPageHref(pageNumber + 1)
-            : undefined
+          pageNumber < meta.totalPages ? getPageHref(pageNumber + 1) : undefined
         }
       />
     </>
   );
 }
 
+// ---------- componentes ----------
+
 function StatCard({
   title,
   value,
   subtitle,
+  href,
+  active,
 }: {
   title: string;
   value: string;
   subtitle: string;
+  href: string;
+  active: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-6">
+    <Link
+      href={href}
+      aria-current={active ? "true" : undefined}
+      className={`rounded-xl border bg-white p-6 transition-colors hover:border-accent ${
+        active ? "border-accent ring-1 ring-accent" : "border-border"
+      }`}
+    >
       <h3 className="text-[13px] font-medium text-muted">{title}</h3>
       <p className="mt-2 text-[28px] font-semibold text-ink">{value}</p>
       <p className="mt-1 text-xs text-muted">{subtitle}</p>
+    </Link>
+  );
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      {STAT_CARDS.map((card) => (
+        <div
+          key={card.title}
+          className="h-[122px] rounded-xl bg-border motion-safe:animate-pulse"
+        />
+      ))}
     </div>
   );
 }
@@ -236,11 +327,8 @@ function StatCard({
 function ListSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="h-8 w-32 rounded-lg bg-border motion-safe:animate-pulse" />
-      <div className="h-8 w-full rounded-lg bg-border motion-safe:animate-pulse" />
-      <div className="h-32 rounded-xl bg-border motion-safe:animate-pulse" />
-      <div className="h-16 w-full max-w-xs rounded-lg bg-border motion-safe:animate-pulse" />
-      <div className="h-16 w-full max-w-xs rounded-lg bg-border motion-safe:animate-pulse" />
+      <div className="h-11 w-full max-w-[420px] rounded-lg bg-border motion-safe:animate-pulse" />
+      <div className="h-64 rounded-xl bg-border motion-safe:animate-pulse" />
     </div>
   );
 }

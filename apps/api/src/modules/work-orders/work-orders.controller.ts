@@ -1,13 +1,13 @@
 import {
   Body,
   Controller,
+  UseGuards,
   Get,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -37,6 +37,8 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { UseRoles } from '../../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import type { TokenPayload } from '../auth/services/token.service.js';
+import { UpdateWorkOrderDto } from './dtos/update-work-order.dto.js';
+import { ScheduleWorkOrderDto } from './dtos/schedule-work-order.dto.js';
 
 @ApiTags('Ordens de Serviço')
 @ApiBearerAuth()
@@ -133,6 +135,49 @@ export class WorkOrdersController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.workOrders.findOne(id, user);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateWorkOrderDto,
+    @CurrentUser() actor: TokenPayload,
+  ) {
+    return this.workOrders.update(id, dto, actor);
+  }
+
+  @Patch(':id/cancel')
+  cancel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: TokenPayload,
+  ) {
+    return this.workOrders.cancel(id, actor);
+  }
+
+  @Patch(':id/start')
+  start(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: TokenPayload,
+  ) {
+    return this.workOrders.start(id, actor);
+  }
+
+  @Patch(':id/complete')
+  @UseRoles('OWNER', 'ADMIN', 'TECHNICIAN')
+  complete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: TokenPayload,
+  ) {
+    return this.workOrders.complete(id, actor);
+  }
+
+  @Patch(':id/schedule')
+  reschedule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ScheduleWorkOrderDto,
+    @CurrentUser() actor: TokenPayload,
+  ) {
+    return this.workOrders.reschedule(id, dto, actor);
   }
 
   @Patch(':id/technician')
