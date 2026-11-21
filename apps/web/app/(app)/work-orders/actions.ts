@@ -378,13 +378,13 @@ export type DashboardData = {
 const TZ = "America/Sao_Paulo";
 const PAGE_SIZE = 50;
 
-const dayKey = (value: Date | string) =>
-  new Date(value).toLocaleDateString("en-CA", { timeZone: TZ });
+// Helper to get date key safely (avoids new Date() at module level issues)
+const getDayKey = (value: string | Date) => new Date(value).toLocaleDateString("en-CA", { timeZone: TZ });
 
 const orderCode = (id: string) => id.slice(-4).toUpperCase();
 
-const scheduledTime = (order: any) =>
-  new Date(order.scheduledAt as string).getTime();
+const getScheduledTime = (scheduledAt: string | null | undefined) =>
+  scheduledAt ? new Date(scheduledAt).getTime() : 0;
 
 // Busca todas as páginas de um status (até 5 páginas), em paralelo
 async function fetchAllByStatus(status: string) {
@@ -407,8 +407,9 @@ async function fetchAllByStatus(status: string) {
 // ---------- Server Action principal do dashboard ----------
 
 export async function fetchDashboard(): Promise<DashboardData> {
+  // Calculate dates inside the server action to avoid prerendering issues
   const now = new Date();
-  const today = dayKey(now);
+  const today = now.toLocaleDateString("en-CA", { timeZone: TZ });
   const month = today.slice(0, 7);
   const startOfToday = new Date(`${today}T00:00:00-03:00`).getTime();
 
@@ -422,12 +423,12 @@ export async function fetchDashboard(): Promise<DashboardData> {
 
   // ---------- números ----------
   const scheduledToday = scheduledRes.rows.filter(
-    (order: any) => order.scheduledAt && dayKey(order.scheduledAt) === today,
+    (order: any) => order.scheduledAt && getDayKey(order.scheduledAt) === today,
   ).length;
 
   const completedThisMonthRows = completedRes.rows.filter(
     (order: any) =>
-      order.completedAt && dayKey(order.completedAt).slice(0, 7) === month,
+      order.completedAt && getDayKey(order.completedAt).slice(0, 7) === month,
   );
   const revenueThisMonth = completedThisMonthRows.reduce(
     (sum: number, order: any) => sum + Number(order.price ?? 0),
@@ -437,15 +438,15 @@ export async function fetchDashboard(): Promise<DashboardData> {
   // ---------- próximos atendimentos (de hoje em diante) ----------
   const upcomingSources = [...scheduledRes.rows, ...inProgressRes.rows]
     .filter(
-      (order: any) => order.scheduledAt && scheduledTime(order) >= startOfToday,
+      (order: any) => order.scheduledAt && getScheduledTime(order.scheduledAt) >= startOfToday,
     )
-    .sort((a: any, b: any) => scheduledTime(a) - scheduledTime(b))
+    .sort((a: any, b: any) => getScheduledTime(a.scheduledAt) - getScheduledTime(b.scheduledAt))
     .slice(0, 6)
     .map((order: any) => ({
       id: order.id,
       code: orderCode(order.id),
       scheduledAt: order.scheduledAt as string,
-      isToday: dayKey(order.scheduledAt as string) === today,
+      isToday: getDayKey(order.scheduledAt as string) === today,
       customerName: order.customer?.name || "",
       serviceName: order.serviceName || "",
       technicianName: order.technician?.name ?? null,
