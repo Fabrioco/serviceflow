@@ -6,30 +6,30 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import type { OrderStatus } from '../features/orders/orders';
 
-const MAP = {
+const MAP: Record<OrderStatus, { box: string; text: string; label: string }> = {
   OPEN: { box: 'bg-blue-100', text: 'text-blue-800', label: 'Aberta' },
   SCHEDULED: { box: 'bg-amber-100', text: 'text-amber-800', label: 'Agendada' },
   IN_PROGRESS: { box: 'bg-teal-100', text: 'text-teal-800', label: 'Em andamento' },
   COMPLETED: { box: 'bg-slate-200', text: 'text-slate-800', label: 'Concluída' },
   CANCELED: { box: 'bg-red-100', text: 'text-red-800', label: 'Cancelada' },
-} as const;
-
-export type OrderStatus = keyof typeof MAP;
+};
 
 function PulseDot() {
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = withRepeat(withTiming(1, { duration: 1400 }), -1, false);
-  }, []);
+  }, [p]);
   const ring = useAnimatedStyle(() => ({
     opacity: 0.5 * (1 - p.value),
     transform: [{ scale: 1 + p.value * 1.6 }],
   }));
+  const dot = { width: 8, height: 8, borderRadius: 4, backgroundColor: '#0F766E' };
   return (
-    <View className="h-2 w-2 items-center justify-center">
-      <Animated.View style={ring} className="absolute h-2 w-2 rounded-full bg-teal-700" />
-      <View className="h-2 w-2 rounded-full bg-teal-700" />
+    <View style={{ width: 8, height: 8, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[dot, { position: 'absolute' }, ring]} />
+      <View style={dot} />
     </View>
   );
 }
