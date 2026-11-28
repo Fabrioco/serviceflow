@@ -5,7 +5,13 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import { StatusPill } from '../../components/status-pill';
 import { Skeleton } from '../../components/skeleton';
-import { formatScheduled, formatWhen, listOrders, orderCode, OrderStatus } from '../../features/orders/orders';
+import {
+  formatScheduled,
+  formatWhen,
+  listOrders,
+  orderCode,
+  OrderStatus,
+} from '../../features/orders/orders';
 
 const FILTERS: { label: string; value?: OrderStatus }[] = [
   { label: 'Todas' },
@@ -113,7 +119,7 @@ export default function Orders() {
                 </View>
                 <Text className="text-[17px] font-bold text-ink">{item.serviceName}</Text>
                 <Text className="text-sm text-muted">
-                  {[item.customer?.name, formatWhen(item.scheduledAt)]
+                  {[item.customer?.name, formatScheduled(item.scheduledAt)]
                     .filter(Boolean)
                     .join(' · ')}
                 </Text>
