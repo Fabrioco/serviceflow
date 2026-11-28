@@ -38,7 +38,7 @@ const iso = (value: Date | string | null) =>
   value === null ? null : new Date(value).toISOString();
 const formatDateTime = (date: Date) =>
   date.toLocaleString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
+    timeZone: 'UTC',
     dateStyle: 'short',
     timeStyle: 'short',
   });
